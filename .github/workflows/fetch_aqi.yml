@@ -2,24 +2,34 @@ name: Fetch AQI Hourly
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run every hour
-  workflow_dispatch:  # Allow manual run
+    - cron: '0 * * * *' # every hour
+  workflow_dispatch:
 
 jobs:
   fetch-aqi:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Install dependencies
-        run: pip install pandas requests
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
 
-      - name: Run AQI fetch script
-        run: python utils/fetch_aqicn_live.py
+    - name: Run AQI fetch script
+      run: |
+        python utils/fetch_aqicn_live.py
+
+    - name: Commit updated AQI data
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add data/karachi_aqi_log.csv
+        git commit -m "Update AQI data [skip ci]" || echo "No changes to commit"
+        git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:main

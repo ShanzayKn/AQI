@@ -32,4 +32,4 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add data/karachi_aqi_log.csv
         git commit -m "Update AQI data [skip ci]" || echo "No changes to commit"
-        git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git HEAD:main
+        git push https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/ShanzayKn/AQI.git HEAD:main

@@ -1,0 +1,33 @@
+## 🎯 Aims
+- Build an **automated pipeline** for fetching AQI data of Karachi.  
+- Train multiple **ML models** daily to predict AQI values from environmental features.  
+- Establish a **CI/CD system** where data collection and model training happen automatically.  
+
+## 🛠️ Struggles
+1. **GitHub Actions authentication issues**  
+   - Initially failed to push updated datasets from workflow. Fixed by using `secrets.GITHUB_TOKEN`.  
+
+2. **Missing / incomplete features**  
+   - PM10 values were mostly missing (NaN). This caused Linear Regression & CatBoost errors.  
+   - Fixed by adding an **imputer** (median filling) and dropping models that can’t handle all-NaN features.  
+
+3. **Model training errors**  
+   - CatBoost crashed due to constant/missing features → skipped.  
+   - Linear Regression failed when NaNs weren’t cleaned. Fixed with preprocessing.  
+
+4. **CI/CD debugging**  
+   - Workflows failed multiple times due to missing dependencies (`xgboost`, `lightgbm`, `catboost`).  
+   - Solved by adding them explicitly in `train_models.yml`.  
+
+## ✅ Results
+- Successfully trained **4 models**: Linear Regression, Random Forest, XGBoost, LightGBM.  
+- Performance metrics are saved in `models/model_results.csv`.  
+- Early results show **tree-based models (XGBoost, LightGBM)** perform better than Linear Regression on AQI prediction.  
+
+## 🔮 Next Steps
+- Integrate visualization (Matplotlib / Dash / Streamlit).  
+- Add **time-series forecasting models** (ARIMA, Prophet, LSTM).  
+- Deploy API endpoint for real-time AQI predictions.  
+- Incorporate additional weather features for better accuracy.  
+
+---

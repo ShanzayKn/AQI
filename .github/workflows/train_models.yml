@@ -1,9 +1,9 @@
 name: Train Models
 
 on:
-  workflow_dispatch:   # allow manual run from GitHub
+  workflow_dispatch:  # run manually
   schedule:
-    - cron: '0 0 * * *'   # run daily at midnight
+    - cron: '0 0 * * *'  # run daily at midnight
 
 jobs:
   train-models:
@@ -32,6 +32,8 @@ jobs:
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add models/saved/*.pkl models/model_results.csv
+        mkdir -p models/saved
+        git add models/saved || true
+        git add models/model_results.csv || true
         git commit -m "Update trained models [skip ci]" || echo "No changes to commit"
         git push origin HEAD:main

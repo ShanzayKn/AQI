@@ -1,95 +1,97 @@
 import pandas as pd
 import numpy as np
 import os
-import sys
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
-from catboost import CatBoostRegressor
 from sklearn.impute import SimpleImputer
 
-# ---------- Load data ----------
-DATA_PATH = "data/karachi_aqi_log.csv"
-if not os.path.exists(DATA_PATH):
-    print(f"❌ Data file not found at {DATA_PATH}")
-    sys.exit(1)
+# ----------------------------
+# 1. Load Data
+# ----------------------------
+data_path = "data/karachi_aqi_log.csv"
+df = pd.read_csv(data_path)
 
-df = pd.read_csv(DATA_PATH)
+print(f"✅ Loaded data with {df.shape[0]} rows and {df.shape[1]} columns")
 
-if df.empty:
-    print("❌ CSV is empty!")
-    sys.exit(1)
+# ----------------------------
+# 2. Features & Target
+# ----------------------------
+features = ["pm2_5", "pm10", "temperature", "humidity"]
+target = "aqi"
 
-print(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
+X = df[features]
+y = df[target]
 
-# ---------- Clean / preprocess ----------
-df = df.dropna(subset=["aqi", "pm2_5"])   # must have AQI & PM2.5
+# Drop all-NaN or constant columns
+X = X.loc[:, X.notna().any()]  # remove all-NaN
+X = X.loc[:, X.nunique() > 1]  # remove constant
 
-# Select feature columns that actually exist & have some data
-feature_cols = ["pm2_5", "pm10", "temperature", "humidity"]
-feature_cols = [c for c in feature_cols if c in df.columns]
+print(f"✅ Features after cleaning: {list(X.columns)}")
 
-# Drop any feature columns that are fully NaN
-valid_features = []
-for col in feature_cols:
-    if df[col].notna().sum() > 0:   # at least 1 valid value
-        valid_features.append(col)
-    else:
-        print(f"⚠️ Dropping {col} (all values are NaN)")
+# ----------------------------
+# 3. Handle Missing Values
+# ----------------------------
+if not X.empty:
+    imputer = SimpleImputer(strategy="median")
+    X_imputed = imputer.fit_transform(X)
+    X = pd.DataFrame(X_imputed, columns=X.columns, index=X.index)
 
-X = df[valid_features].copy()
-y = df["aqi"]
+# ----------------------------
+# 4. Train-Test Split
+# ----------------------------
+if X.shape[1] == 0:
+    print("⚠️ No usable features after cleaning. Exiting training.")
+    exit(0)
 
-# Impute remaining missing values with median
-imputer = SimpleImputer(strategy="median")
-X_imputed = imputer.fit_transform(X)
-X = pd.DataFrame(X_imputed, columns=valid_features)
-
-print("✅ After cleaning:")
-print(X.head())
-
-# ---------- Split ----------
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# ---------- Models ----------
+# ----------------------------
+# 5. Models to Train
+# ----------------------------
 models = {
     "LinearRegression": LinearRegression(),
-    "Ridge": Ridge(),
-    "Lasso": Lasso(),
-    "XGBoost": XGBRegressor(objective="reg:squarederror", random_state=42),
-    "LightGBM": LGBMRegressor(random_state=42),
-    "CatBoost": CatBoostRegressor(verbose=0, random_state=42)
+    "RandomForest": RandomForestRegressor(n_estimators=100, random_state=42),
+    "XGBoost": XGBRegressor(n_estimators=100, random_state=42, verbosity=0),
+    "LightGBM": LGBMRegressor(n_estimators=100, random_state=42),
 }
 
 results = []
-MODEL_DIR = "models/saved"
-os.makedirs(MODEL_DIR, exist_ok=True)
 
-# ---------- Train & Evaluate ----------
+# ----------------------------
+# 6. Train & Evaluate
+# ----------------------------
 for name, model in models.items():
-    print(f"🚀 Training {name}...")
-    model.fit(X_train, y_train)
-    preds = model.predict(X_test)
+    try:
+        print(f"🚀 Training {name}...")
+        model.fit(X_train, y_train)
 
-    mse = mean_squared_error(y_test, preds)
-    r2 = r2_score(y_test, preds)
+        y_pred = model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
 
-    results.append({"Model": name, "MSE": mse, "R2": r2})
+        results.append({"Model": name, "MSE": mse, "R2": r2})
 
-    # Save model
-    model_path = os.path.join(MODEL_DIR, f"{name}.pkl")
-    joblib.dump(model, model_path)
-    print(f"💾 Saved {name} → {model_path}")
+        # Save model
+        os.makedirs("models/saved", exist_ok=True)
+        joblib.dump(model, f"models/saved/{name}.pkl")
+        print(f"💾 Saved {name} → models/saved/{name}.pkl")
 
-# ---------- Save results ----------
+    except Exception as e:
+        print(f"⚠️ Skipping {name} due to error: {e}")
+
+# ----------------------------
+# 7. Save Results
+# ----------------------------
 results_df = pd.DataFrame(results)
 os.makedirs("models", exist_ok=True)
 results_df.to_csv("models/model_results.csv", index=False)
 
-print("\n✅ Training complete. Results:")
+print("✅ Training complete. Results saved to models/model_results.csv")
 print(results_df)

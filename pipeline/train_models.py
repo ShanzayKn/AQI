@@ -7,14 +7,25 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from xgboost import XGBRegressor
 import joblib
+import sys
+
 
 # Load dataset
+# Load data
 df = pd.read_csv("data/karachi_aqi_log.csv")
 
-# Drop rows with missing values
-df = df.dropna()
+# Check if empty
+if df.empty or len(df) < 10:  # require at least 10 rows
+    print(f"❌ Not enough data to train. Found {len(df)} rows.")
+    sys.exit(0)
 
-# Features and target
+# Clean data
+df = df.dropna(subset=["aqi", "pm2_5", "pm10"])
+if df.empty:
+    print("❌ No rows left after dropping NaNs.")
+    sys.exit(0)
+
+# Define features and target
 X = df[["pm2_5", "pm10", "temperature", "humidity"]]
 y = df["aqi"]
 

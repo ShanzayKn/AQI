@@ -13,14 +13,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0  # ensures full history and latest commits
+        fetch-depth: 0
     
     - name: List data folder
       run: ls -lh data || echo "No data folder found"
 
     - name: Show head of CSV
       run: head -n 20 data/karachi_aqi_log.csv || echo "CSV not found"
-
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -31,16 +30,26 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install scikit-learn xgboost lightgbm catboost
-
+        pip install scikit-learn xgboost lightgbm catboost joblib pandas
 
     - name: Run training script
       run: python pipeline/train_models.py
-      
+
     - name: Commit trained models & results
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add models/saved/*.pkl models/model_results.csv || echo "No model files to add"
+        git add models/saved/*.pkl models/model_results.csv models/best_model.pkl models/best_model_info.json || echo "No model files to add"
         git commit -m "Update trained models [skip ci]" || echo "No changes to commit"
         git push origin HEAD:main
+
+    - name: Upload artifacts (download from Actions)
+      uses: actions/upload-artifact@v4
+      with:
+        name: trained-models-and-results
+        path: |
+          models/model_results.csv
+          models/saved/*.pkl
+          models/best_model.pkl
+          models/best_model_info.json
+        if-no-files-found: warn

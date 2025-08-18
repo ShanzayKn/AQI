@@ -1,84 +1,37 @@
-import os
-import pickle
-import pandas as pd
-import numpy as np
+name: Train Models
 
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from lightgbm import LGBMRegressor
+on:
+  workflow_dispatch:   # allow manual run from GitHub
+  schedule:
+    - cron: '0 0 * * *'   # run daily at midnight
 
-# =========================
-# Load Data
-# =========================
-data_path = "data/karachi_aqi_log.csv"
-df = pd.read_csv(data_path)
+jobs:
+  train-models:
+    runs-on: ubuntu-latest
 
-print(f"✅ Loaded data with {df.shape[0]} rows and {df.shape[1]} columns")
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
-# =========================
-# Preprocess Data
-# =========================
-# Features and target
-X = df[["pm2_5", "pm10", "temperature", "humidity"]]
-y = df["aqi"]
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-# Impute missing values (median for numeric)
-imputer = SimpleImputer(strategy="median")
-X_imputed = imputer.fit_transform(X)
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install scikit-learn xgboost lightgbm
 
-X = pd.DataFrame(X_imputed, columns=X.columns)
+    - name: Run training script
+      run: python pipeline/train_models.py
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-# =========================
-# Models to Train
-# =========================
-models = {
-    "LinearRegression": LinearRegression(),
-    "RandomForest": RandomForestRegressor(n_estimators=100, random_state=42),
-    "XGBoost": XGBRegressor(n_estimators=200, learning_rate=0.1, random_state=42),
-    "LightGBM": LGBMRegressor(n_estimators=200, learning_rate=0.1, random_state=42),
-    # "CatBoost": CatBoostRegressor(verbose=0, iterations=200, learning_rate=0.1)  # DISABLED
-}
-
-# =========================
-# Train & Evaluate
-# =========================
-os.makedirs("models/saved", exist_ok=True)
-results = []
-
-for name, model in models.items():
-    try:
-        print(f"🚀 Training {name}...")
-        model.fit(X_train, y_train)
-        preds = model.predict(X_test)
-
-        mse = mean_squared_error(y_test, preds)
-        r2 = r2_score(y_test, preds)
-        print(f"✅ {name}: MSE={mse:.2f}, R²={r2:.2f}")
-
-        # Save model
-        model_path = f"models/saved/{name}.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(model, f)
-        print(f"💾 Saved {name} → {model_path}")
-
-        results.append([name, mse, r2])
-
-    except Exception as e:
-        print(f"⚠️ Skipping {name} due to error: {e}")
-        results.append([name, None, None])
-
-# =========================
-# Save Results
-# =========================
-results_df = pd.DataFrame(results, columns=["Model", "MSE", "R2"])
-results_df.to_csv("models/model_results.csv", index=False)
-print("📊 Saved results → models/model_results.csv")
+    - name: Commit trained models & results
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add models/saved/*.pkl models/model_results.csv
+        git commit -m "Update trained models [skip ci]" || echo "No changes to commit"
+        git push origin HEAD:main

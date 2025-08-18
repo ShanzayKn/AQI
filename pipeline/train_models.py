@@ -26,19 +26,29 @@ if df.empty:
 print(f"✅ Loaded data with {len(df)} rows and {len(df.columns)} columns")
 
 # ---------- Clean / preprocess ----------
-# Must have AQI + PM2.5
-df = df.dropna(subset=["aqi", "pm2_5"])
+df = df.dropna(subset=["aqi", "pm2_5"])   # must have AQI & PM2.5
 
-# Features
-X = df[["pm2_5", "pm10", "temperature", "humidity"]].copy()
+# Select feature columns that actually exist & have some data
+feature_cols = ["pm2_5", "pm10", "temperature", "humidity"]
+feature_cols = [c for c in feature_cols if c in df.columns]
+
+# Drop any feature columns that are fully NaN
+valid_features = []
+for col in feature_cols:
+    if df[col].notna().sum() > 0:   # at least 1 valid value
+        valid_features.append(col)
+    else:
+        print(f"⚠️ Dropping {col} (all values are NaN)")
+
+X = df[valid_features].copy()
 y = df["aqi"]
 
-# Fill missing values with median
+# Impute remaining missing values with median
 imputer = SimpleImputer(strategy="median")
 X_imputed = imputer.fit_transform(X)
-X = pd.DataFrame(X_imputed, columns=X.columns)
+X = pd.DataFrame(X_imputed, columns=valid_features)
 
-print("✅ After imputation:")
+print("✅ After cleaning:")
 print(X.head())
 
 # ---------- Split ----------
